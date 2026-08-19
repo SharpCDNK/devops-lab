@@ -29,3 +29,11 @@ docker0          DOWN           172.17.0.1/16 fe80::10d9:87ff:fe3c:e6c5/64
 tun0             UNKNOWN        10.8.0.1/24 fe80::963a:fc23:6e0e:df9f/64
 br-c8252a487554  DOWN           172.18.0.1/16 fe80::2cfa:4eff:fe3c:a96/64
 
+First time after change main.py:
+time docker build -f Dockerfile.naive -t devops-lab:naive
+11.4s, size 1.3GB.
+New docker file:
+devops-lab:local              c99385839e26        189MB             0B
+devops-lab:naive              de2128283424        1.3GB             0B
+Second time after change main.py:
+[+] Building 1.2s (16/16) FINISHED
