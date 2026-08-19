@@ -1,0 +1,46 @@
+# Neovim / Vim / Editors
+*.swp
+*.swo
+*~
+[._]*.un~
+Session.vim
+.netrwhist
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Секреты и ключи
+.env
+.env.*
+!.env.example
+!.env.template
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+id_ecdsa*
+*vault*.plain
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Ansible & Логи
+backups/
+*.retry
+*.log
