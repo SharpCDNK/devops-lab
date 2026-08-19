@@ -1,0 +1,17 @@
+.git
+.github
+.env
+*.env
+!.env.example
+ansible/
+deploy/
+docs/
+scripts/
+**/__pycache__/
+**/*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+README.md
+Makefile
