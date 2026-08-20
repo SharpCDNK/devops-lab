@@ -11,4 +11,25 @@
       changed_when: false
 
   roles:
-    - { role: baseline, tags: [baseline] }
+    - role: baseline
+      tags: [baseline]
+    - role: docker
+      tags: [docker]
+    - role: app
+      tags: [app]
+
+  post_tasks:
+    - name: Wait for application to answer
+      ansible.builtin.uri:
+        url: "http://127.0.0.1/health"
+        status_code: 200
+      register: health
+      retries: 12
+      delay: 5
+      until: health.status == 200
+      tags: [app]
+
+    - name: Report
+      ansible.builtin.debug:
+        msg: "OK: http://{{ ansible_host }}/  ·  версия {{ app_version | default('dev') }}"
+      tags: [app]

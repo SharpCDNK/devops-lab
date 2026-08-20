@@ -1,0 +1,48 @@
+groups:
+  - name: infrastructure
+    rules:
+      - alert: DiskWillFillSoon
+        expr: |
+          (1 - node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"}
+             / node_filesystem_size_bytes{mountpoint="/",fstype!="tmpfs"}) > 0.80
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Диск заполнен более чем на 80% ({{ $value | humanizePercentage }})"
+          runbook: "docs/runbook.md#disk-full"
+
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 0.90
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Доступной памяти меньше 10%"
+
+      - alert: TargetDown
+        expr: up == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Цель {{ $labels.job }} ({{ $labels.instance }}) недоступна"
+          runbook: "docs/runbook.md#service-down"
+
+  - name: application
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(app_http_requests_total{status=~"5.."}[5m]))
+            / sum(rate(app_http_requests_total[5m])) > 0.05
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "Более 5% запросов отвечают 5xx"
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(app_http_request_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "p95 латентности выше 1 секунды"
