@@ -33,8 +33,8 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          # known_hosts вместо StrictHostKeyChecking=no: защита от MITM
-          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          # Добавляем хост в known_hosts динамически
+          ssh-keyscan -H ${{ vars.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
           chmod 644 ~/.ssh/known_hosts
       - name: Deploy new image
         env:
@@ -43,10 +43,6 @@ jobs:
           TAG: ${{ github.event.inputs.image_tag || github.sha }}
           IMAGE: ${{ env.IMAGE_NAME_LC }}
         run: |
-          HOST="${{ vars.SERVER_HOST }}"
-          USER="${{ vars.SERVER_USER }}"
-          TAG="${{ github.event.inputs.image_tag || github.sha }}"
-          IMAGE="${{ env.IMAGE_NAME_LC }}"
           ssh -i ~/.ssh/id_ed25519 "${USER}@${HOST}" bash -s <<EOSSH
           set -euo pipefail
           cd /opt/devops-lab
