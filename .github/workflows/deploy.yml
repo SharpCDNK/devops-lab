@@ -43,10 +43,13 @@ jobs:
           TAG: ${{ github.event.inputs.image_tag || github.sha }}
           IMAGE: ${{ env.IMAGE_NAME_LC }}
         run: |
+          HOST="${{ vars.SERVER_HOST }}"
+          USER="${{ vars.SERVER_USER }}"
+          TAG="${{ github.event.inputs.image_tag || github.sha }}"
+          IMAGE="${{ env.IMAGE_NAME_LC }}"
           ssh -i ~/.ssh/id_ed25519 "${USER}@${HOST}" bash -s <<EOSSH
           set -euo pipefail
           cd /opt/devops-lab
-          # Сохраняем текущий образ, чтобы было куда откатиться
           CURRENT=\$(grep '^IMAGE=' .env | cut -d= -f2-)
           echo "\$CURRENT" > .previous_image
           echo "current image: \$CURRENT"
