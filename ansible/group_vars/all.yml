@@ -1,0 +1,25 @@
+---
+timezone: Europe/Minsk
+admin_user: deploy
+admin_ssh_key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/devops_lab_id_ed25519.pub') }}"
+ssh_permit_root_login: "yes"
+ssh_password_auth: "no"
+ssh_port: 22
+base_packages: [curl, git, htop, vim, unzip, ca-certificates, gnupg, ufw, fail2ban, jq, rsync]
+ufw_allowed_ports:
+  - { port: "22",  proto: tcp, comment: "SSH" }
+  - { port: "80",  proto: tcp, comment: "HTTP" }
+  - { port: "443", proto: tcp, comment: "HTTPS" }
+
+swap_enabled: true
+swap_size_mb: 2048
+
+app_dir: /opt/devops-lab
+backup_dir: /opt/backups
+backup_keep_days: 7
+
+postgres_user: app
+postgres_db: appdb
+grafana_admin_user: admin
+app_image: "ghcr.io/sharpcdnk/devops-lab:latest"
+app_version: "dev"

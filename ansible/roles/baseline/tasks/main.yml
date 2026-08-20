@@ -1,0 +1,140 @@
+---
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ timezone }}"
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ base_packages }}"
+    state: present
+
+- name: Create admin user
+  ansible.builtin.user:
+    name: "{{ admin_user }}"
+    shell: /bin/bash
+    groups: sudo
+    append: true
+    create_home: true
+
+- name: Deploy authorized key for admin user
+  ansible.posix.authorized_key:
+    user: "{{ admin_user }}"
+    key: "{{ admin_ssh_key }}"
+    state: present
+    exclusive: false
+
+- name: Allow passwordless sudo for admin user
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/90-{{ admin_user }}"
+    content: "{{ admin_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    mode: "0440"
+    validate: "visudo -cf %s"
+
+# --- SSH hardening ---
+# ВАЖНО: перед первым прогоном убедись, что вход по ключу под admin_user работает.
+# Иначе после отключения паролей ты потеряешь доступ.
+- name: Harden sshd config
+  ansible.builtin.template:
+    src: sshd_hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/99-hardening.conf
+    mode: "0644"
+    validate: "sshd -t -f %s"
+  notify: Restart sshd
+
+# --- Firewall ---
+- name: Deny all incoming traffic by default
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+
+- name: Allow all outgoing traffic by default
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+
+- name: Allow required ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    comment: "{{ item.comment }}"
+  loop: "{{ ufw_allowed_ports }}"
+
+- name: Enable ufw
+  community.general.ufw:
+    state: enabled
+
+# --- fail2ban ---
+- name: Configure fail2ban for sshd
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.d/sshd.local
+    mode: "0644"
+    content: |
+      [sshd]
+      enabled = true
+      port = {{ ssh_port }}
+      maxretry = 5
+      findtime = 10m
+      bantime = 1h
+  notify: Restart fail2ban
+
+- name: Ensure fail2ban is running
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: true
+
+# --- Автообновления безопасности ---
+- name: Install unattended-upgrades
+  ansible.builtin.apt:
+    name: unattended-upgrades
+    state: present
+
+- name: Enable unattended-upgrades
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    mode: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+# --- Swap ---
+- name: Check swap file
+  ansible.builtin.stat:
+    path: /swapfile
+  register: baseline_swapfile
+  when: swap_enabled | bool
+
+- name: Create swap file
+  ansible.builtin.command:
+    cmd: "fallocate -l {{ swap_size_mb }}M /swapfile"
+    creates: /swapfile
+  when: swap_enabled | bool and not baseline_swapfile.stat.exists
+
+- name: Secure swap file
+  ansible.builtin.file:
+    path: /swapfile
+    mode: "0600"
+  when: swap_enabled | bool
+
+- name: Format swap file
+  ansible.builtin.command: "mkswap /swapfile"
+  when: swap_enabled | bool and not baseline_swapfile.stat.exists
+  register: baseline_mkswap
+  changed_when: baseline_mkswap.rc == 0
+
+- name: Enable swap in fstab
+  ansible.posix.mount:
+    name: none
+    src: /swapfile
+    fstype: swap
+    opts: sw
+    state: present
+  when: swap_enabled | bool
+
+- name: Turn swap on
+  ansible.builtin.command: "swapon /swapfile"
+  when: swap_enabled | bool and not baseline_swapfile.stat.exists
+  register: baseline_swapon
+  changed_when: baseline_swapon.rc == 0
+  failed_when: baseline_swapon.rc != 0 and 'already' not in baseline_swapon.stderr

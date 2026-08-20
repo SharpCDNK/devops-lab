@@ -1,0 +1,11 @@
+# Управляется Ansible. Ручные правки будут перезаписаны.
+Port {{ ssh_port }}
+PermitRootLogin {{ ssh_permit_root_login }}
+PasswordAuthentication {{ ssh_password_auth }}
+PubkeyAuthentication yes
+ChallengeResponseAuthentication no
+X11Forwarding no
+MaxAuthTries 3
+ClientAliveInterval 300
+ClientAliveCountMax 2
+AllowUsers {{ admin_user }}

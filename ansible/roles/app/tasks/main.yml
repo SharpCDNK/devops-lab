@@ -1,0 +1,78 @@
+---
+- name: Create application directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0750"
+  loop:
+    - "{{ app_dir }}"
+    - "{{ app_dir }}/nginx"
+    - "{{ app_dir }}/prometheus"
+    - "{{ app_dir }}/grafana/provisioning/datasources"
+    - "{{ app_dir }}/grafana/provisioning/dashboards"
+    - "{{ backup_dir }}"
+
+- name: Copy deployment files
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../deploy/"
+    dest: "{{ app_dir }}/"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0640"
+    directory_mode: "0750"
+  notify: Restart stack
+
+- name: Render .env
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ app_dir }}/.env"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0600"
+  no_log: true
+  notify: Restart stack
+
+- name: Copy backup script
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../scripts/backup.sh"
+    dest: /usr/local/bin/db-backup.sh
+    mode: "0750"
+    owner: root
+    group: root
+
+- name: Schedule nightly database backup
+  ansible.builtin.cron:
+    name: "postgres backup"
+    hour: "3"
+    minute: "0"
+    job: "BACKUP_DIR={{ backup_dir }} KEEP_DAYS={{ backup_keep_days }} /usr/local/bin/db-backup.sh >> /var/log/db-backup.log 2>&1"
+
+- name: Log in to GHCR (for private images)
+  ansible.builtin.command:
+    cmd: "docker login ghcr.io -u {{ ghcr_user }} --password-stdin"
+    stdin: "{{ ghcr_token }}"
+  become: true
+  become_user: "{{ admin_user }}"
+  when: ghcr_token is defined and ghcr_token | length > 0
+  no_log: true
+  changed_when: false
+
+- name: Pull images
+  ansible.builtin.command:
+    cmd: "docker compose pull"
+    chdir: "{{ app_dir }}"
+  become: true
+  become_user: "{{ admin_user }}"
+  register: app_pull_out
+  changed_when: "'Pulled' in app_pull_out.stderr or 'Downloaded' in app_pull_out.stderr"
+
+- name: Start the stack
+  ansible.builtin.command:
+    cmd: "docker compose up -d --remove-orphans"
+    chdir: "{{ app_dir }}"
+  become: true
+  become_user: "{{ admin_user }}"
+  register: app_compose_out
+  changed_when: "'Started' in app_compose_out.stderr or 'Created' in app_compose_out.stderr or 'Recreated' in app_compose_out.stderr"
